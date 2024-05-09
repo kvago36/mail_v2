@@ -1,0 +1,10 @@
+[package]
+name = "tcpserver"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tcp = {path = "../tcp"}
+tokio = { version = "1.37.0", features = ["full"] }
+rand = "0.8"
+libsql = "0.3.5"
