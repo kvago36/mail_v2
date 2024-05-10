@@ -1,12 +1,8 @@
-use std::cell::RefCell;
 use std::error;
 use std::fmt;
 use tcp::request::{Command, TcpRequest};
-use tokio::io::AsyncWriteExt;
-use tokio::net::TcpStream;
 
 pub static READY: &str = "220";
-// pub static ERROR: &str = "500";
 pub static OK: &str = "250";
 pub static READY_TO_RECIEVE: &str = "354";
 pub static END: &str = "221";
@@ -18,13 +14,12 @@ enum State {
     Mail(String),
     Data,
     Recipient(Vec<String>),
-    Ended
+    Ended,
 }
 
 pub struct Post {
     state: State,
     content: String,
-    // writer: &'a mut TcpStream
 }
 
 #[derive(Debug)]
@@ -93,17 +88,7 @@ impl Post {
 
                     Ok((OK, response_string))
                 }
-                // (Command::DATA, State::Recipient(_)) => {
-                //     self.state = State::Data;
-
-                //     Ok((READY_TO_RECIEVE, "354 End data with <CR><LF>.<CR><LF>\n".to_string()))
-                // }
-                // (Command::QUIT, _) => {
-                //     self.state = State::Ended;
-
-                //     Ok((END, "End\n".to_string()))
-                // }
-                _ => Err(CustomError::UnknowCommand)
+                _ => Err(CustomError::UnknowCommand),
             }
         } else {
             match req.command {
@@ -111,16 +96,16 @@ impl Post {
                     self.state = State::Ended;
 
                     Ok((END, "End\n".to_string()))
-                },
+                }
                 Command::DATA => {
                     self.state = State::Data;
-                    Ok((READY_TO_RECIEVE, "354 End data with <CR><LF>.<CR><LF>\n".to_string()))
-                },
-                _ => Err(CustomError::EmptyPayloadError)
+                    Ok((
+                        READY_TO_RECIEVE,
+                        "354 End data with <CR><LF>.<CR><LF>\n".to_string(),
+                    ))
+                }
+                _ => Err(CustomError::EmptyPayloadError),
             }
-
-            // return Err(CustomError::EmptyPayloadError);
         }
     }
 }
-

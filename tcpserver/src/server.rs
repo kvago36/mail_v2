@@ -1,39 +1,29 @@
 use std::error::Error;
 
+use mongodb::{Collection};
 use tcp::mail::Mail;
-use tokio::net::TcpStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use rand::Rng;
+use tokio::net::TcpStream;
 
 use tcp::request::TcpRequest;
 
-use crate::state::{Post, READY_TO_RECIEVE, END};
+use crate::state::{Post, END, READY_TO_RECIEVE};
 
 pub struct Server {
     state: Post,
+    store: Collection<Mail>,
     stream: TcpStream,
-    data: bool
+    data: bool,
 }
 
 impl Server {
-    pub fn new(stream: TcpStream) -> Self {
+    pub fn new(stream: TcpStream, store: Collection<Mail>) -> Self {
         Server {
             state: Post::new(),
-            stream: stream,
-            data: false
+            stream,
+            store,
+            data: false,
         }
-    }
-
-    fn generate_random_string(length: usize) -> String {
-        let mut rng = rand::thread_rng();
-        let charset: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        let random_string: String = (0..length)
-            .map(|_| {
-                let idx = rng.gen_range(0..charset.len());
-                charset[idx] as char
-            })
-            .collect();
-        random_string
     }
 
     pub async fn serve(mut self) -> Result<(), Box<dyn Error>> {
@@ -54,17 +44,20 @@ impl Server {
             if self.data == true {
                 let mail = Mail::from(msg);
 
+                let result = self.store.insert_one(mail, None).await;
+
+                match result {
+                    Ok(insert_one) => {
+                        let inserted = format!("250 Ok: queued as {}", insert_one.inserted_id);
+                        self.stream.write_all(inserted.as_bytes()).await?;
+                    }
+                    Err(e) => {
+                        println!("{}", e);
+                        self.stream.write_all(b"500 Error").await?;
+                    }
+                }
+
                 self.data = false;
-
-                println!("server get email{:?}", mail);
-
-                let random = Server::generate_random_string(8);
-                let ds = format!("250 Ok: queued as {}", random);
-                
-
-                println!("server responded to email{:?}", ds);
-
-                self.stream.write_all(ds.as_bytes()).await?;
             } else {
                 let request = TcpRequest::from(msg);
 
